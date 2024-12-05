@@ -1,0 +1,89 @@
+---
+title: "GraviModel_Short"
+author: "Bella Mironova"
+date: "2024-12-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Построение зон влияния городов с помощью простой гравитационной модели (на основе матрицы расстояний из QGIS)
+
+Установка и загрузка необходимых библиотек
+```{r echo=FALSE, include=FALSE}
+
+library(sf) # Для работы с геометриями
+library(dplyr)# Для манипуляций с данными
+library(sp) # Для пространственного анализа
+library(mapview) # Для интерактивной визуализации пространственных данных
+```
+
+
+### 1.Прочитаем данные о городах
+
+```{r reading cities}
+
+# Чтение CSV файла
+data <- read.csv("data/data.csv")
+
+# Проверка структуры данных
+str(data)
+
+```
+
+
+### 2.Прочитаем данные Distanse Matrix
+
+```{r reading matrix}
+
+# Чтение CSV файла
+distance_matrix <- read.csv("data/distance_matrix.csv")
+
+# Проверка структуры данных
+str(distance_matrix)
+
+```
+В данном случае на основе матрицы расстояний моих рассчетов в QGIS: InputID - id города, TargedID - id сетки. Важно при выгрузке матрицы расстояний из QGIS четко понимать что за что отвечает у вас.
+
+### 3. Присоединяем данные по населению городов к матрице расстояний
+```{r join popToMatrix}
+
+#Присоединяем данные о населении из region_cities к distance_matrix
+distance_matrix_withpop <- distance_matrix %>% left_join(data %>% select('id', 'population', 'settlement'), by=c("InputID"="id"))
+
+```
+
+
+### 4. Рассчитываем потенциал поля расселения
+```{r potential calculation}
+
+
+
+# расчет потенциала: население города разделить на расстояние до него в квадрате
+distance_matrix_withpop <- distance_matrix_withpop %>% mutate(potential = population/(Distance^2))
+
+```
+
+
+### 5. Для каждой точки вычисляем максимальный потенциал
+```{r max potential}
+
+
+#Группируем по GRID_ID и рассчитываем максимальный потенциал для каждой точки сетки (TargetID - идентификатор сетки) и фильтруем по максимальному потенциалу
+max_potential_per_grid <- distance_matrix_withpop %>% group_by(TargetID) %>% filter(potential == max(potential))
+
+
+
+```
+
+### 6.Сохраняем результат
+```{r saving data}
+
+# Сохранение объекта max_potential_per_grid  в формат csv
+#st_write(max_potential_per_grid, "data/max_potential_per_grid.csv")
+```
+
+Переходим в QGIS и присоединяем получившийся результат к сетке 
